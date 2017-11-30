@@ -1,5 +1,6 @@
 # encoding: utf-8
 
+
 import tweepy
 import pickle
 import string
@@ -46,34 +47,25 @@ accept_letters=string.ascii_letters
 # TODO: Check that the user doesn't already exist in the DB before inserting
 
 class MyStreamListener(tweepy.StreamListener):
-
     """
     Called whenever a new random tweet is found
 
     @param tweet: tweet object representation of the new tweet
     """
     def on_status(self, tweet):
-        if tweet_contains_video(tweet):
-
-            user_name = tweet.author.screen_name
-            checkexist = "select username from tweets where username='" + user_name + "'"
-
-            print("NAME: " + user_name)
-            tweet_string = get_users_tweets_by_screen_name(user_name)
-            print("TWEET33 " + tweet.text)
-            print("TWEETS: " + tweet_string)
-
-            # if executeQuery(checkexist) == 0:
-            #     print("NAME: " + user_name)
-            #     tweet_string, video_links = get_users_tweets_and_links(tweet)
-            #     #print("TWEETS: " + tweet_string)
-            #     #print("VIDEO_URLS: " + str(video_links))
-            #     #  TODO: For loop through the video_links and add to database
-            #     video_links_strings = constructURLStrings(video_links)
-            #     querystr = "INSERT into tweets (username, tweets, urls) VALUES ('" + user_name + "', '" + tweet_string + "', '" + video_links_strings + "')"
-            #     executeQuery(querystr)
+        if (not tweet.retweeted) and ('RT @' not in tweet.text):
+            if any(phraseInt[1:len(phraseInt)-1].replace(" ","") in tweet.text.replace(" ","") for phraseInt in phrasedInterests):
+                obj_of_interest = ""
+                for interest in interests:
+                    if interest in tweet.text.replace(" ","").lower():
+                        obj_of_interest = interest
+                if obj_of_interest != "":
+                    tweet_string = get_users_tweets_by_screen_name(tweet.author.screen_name) # 100 of user's tweets
+                    print(obj_of_interest + ": ", tweet.author.screen_name, tweet.text)
+                    # DO INSERTION HERE
 
     def on_error(self, status_code):
+
         if status_code == 420:
             #returning False in on_status disconnects the stream
             return False
@@ -114,7 +106,7 @@ def get_users_tweets_and_links(tweet):
     return (fixed_tweet_string,video_links)
 
 def get_users_tweets_by_screen_name(screen_name):
-    user_tweets = api.user_timeline(screen_name=screen_name,count=200)
+    user_tweets = api.user_timeline(screen_name=screen_name,count=100)
     user_tweets = [timeline_tweet.text for timeline_tweet in user_tweets]
     video_links = []
     tweet_string = " ".join(user_tweets)
@@ -128,7 +120,8 @@ def get_users_tweets_by_screen_name(screen_name):
 
 def search(interests,phrase="*"):
     # searchQuery looks like: "pepsi OR coke OR sprite -filter:retweets AND -filter:replies lang:en"
-    phrasedInterests = ["\""+phrase.replace("*",interest)+"\"" for interest in interests]
+    print (interests)
+    print(phrasedInterests)
     searchQuery = " OR ".join(phrasedInterests)
     searchQuery += "-filter:retweets AND -filter:replies lang:en" # filter retweets/replies, and english only
     #searchQuery = "coke -filter:retweets AND -filter:replies"
@@ -162,14 +155,17 @@ def search(interests,phrase="*"):
                                             max_id=str(max_id - 1),
                                             since_id=sinceId)
             if not new_tweets:
-                print("No more tweets found")
+                print("No more tweets found through search")
                 break
             for tweet in new_tweets:
                 obj_of_interest = ""
                 for interest in interests:
                     if interest in tweet.text.replace(" ","").lower():
                         obj_of_interest = interest
-                print (obj_of_interest + ": ",tweet.author.screen_name, tweet.text)
+                if obj_of_interest != "":
+                    tweet_string = get_users_tweets_by_screen_name(tweet.author.screen_name) # 100 of the users tweets
+                    print (obj_of_interest + ": ",tweet.author.screen_name, tweet.text)
+                    # DO INSERTION HERE
             tweetCount += len(new_tweets)
             max_id = new_tweets[-1].id
         except tweepy.TweepError as e:
@@ -196,10 +192,12 @@ def stream_tweets():
     #myStream.sample(async=False, languages=["en"])
 
     # use myStream.filter() to get keyword searches for the 2nd part of the project
-    #myStream.filter(track=interests, async=False, languages=["en"])
+    myStream.filter(track=interests, async=False, languages=["en"])
 
 if __name__ == '__main__':
-    interests = ["coke"]
-    phrase = "*"
+    interests = ["coke","pepsi"]
+    phrase = "love *"
+    phrasedInterests = ["\"" + phrase.replace("*", interest) + "\"" for interest in interests]
     search(interests,phrase)
-    #stream_tweets()
+    print("STREAMING")
+    stream_tweets()
